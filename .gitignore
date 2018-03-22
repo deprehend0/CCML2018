@@ -1,0 +1,3 @@
+venv/
+.idea
+wg3-semantic_space_models/glove.*
