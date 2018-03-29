@@ -1,6 +1,7 @@
 import sys, random, collections, os
 
 # Since we split on whitespace, this can never be a word
+
 NONWORD = "\n"
 
 

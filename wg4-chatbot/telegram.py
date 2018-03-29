@@ -8,13 +8,35 @@ import time
 import urllib
 import os
 import logging
-from markov_norder import Markov
+from gensim.corpora import Dictionary
+from gensim.models import TfidfModel
+from gensim.similarities import Similarity
+from nltk import word_tokenize
+import numpy as np
+import numbers
+import random
 
 # python3: urllib.parse.quote_plus
 # python2: urllib.pathname2url
 
 TOKEN = os.environ['CCML_BOT']  # don't put this in your repo! (put in config, then import config)
 URL = "https://api.telegram.org/bot{}/".format(TOKEN)
+
+gen_quotes = None
+dictionary = None
+corpus = None
+tf_idf = None
+similarities = None
+raw_quotes = None
+
+def initialize_similairty_model():
+    with open('./quotes/quotes.txt', mode='r') as file:
+        raw_quotes = file.readlines()
+    gen_quotes = [[w.lower() for w in word_tokenize(quote)] for quote in raw_quotes]
+    dictionary = Dictionary(gen_quotes)
+    corpus = [dictionary.doc2bow(gen_quote) for gen_quote in gen_quotes]
+    tf_idf = TfidfModel(corpus)
+    similarities = Similarity('./quotes/quote_similarities/', tf_idf[corpus], num_features=len(dictionary))
 
 
 def get_url(url):
@@ -44,13 +66,18 @@ def get_last_update_id(updates):
     return max(update_ids)
 
 
+def echo_message(update):
+    msg = update.get('message')
+    if msg:
+        text = msg.get('text')
+        chat = msg.get('chat').get('id')
+        send_message(text, chat)
+
+
+
 def echo_all(updates):
     for update in updates.get('result'):
-        msg = update.get('message')
-        if msg:
-            text = msg.get('text')
-            chat = msg.get('chat').get('id')
-            send_message(text, chat)
+        echo_message(update)
 
 
 def get_last_chat_id_and_text(updates):
@@ -76,55 +103,93 @@ def send_speech_based_text(updates, text):
 
 
 def is_welcome_message(text):
-    greetings = ['hi', 'hello', 'ola', 'good morning', 'good evening', 'good day']
-    print(any([g for g in greetings if g in urllib.pathname2url(text)]))
-    return any([urllib.pathname2url(text).find(g) for g in greetings])
+    greetings = ['hello', 'good morning', 'good evening']
+    return any(g in text.lower() for g in greetings)
 
 
 def send_welcome_message(update):
-    text = 'Hi there good one! I\'m working on some more greetings'
+    greetings = ['Hello', 'Good day', 'Welcome', 'Bon jour']
+    text = random.choice(greetings)
+    url = URL + "sendMessage?text={}&chat_id={}".format(text, update["message"]["chat"]["id"])
+    get_url(url)
+
+
+def is_about_message(text):
+    about_messages = ['Who are you', 'what are you']
+    return any(a.lower() in text.lower() for a in about_messages)
+
+
+def send_about_message(update):
+    text = 'Well... I\'m an aritfical person who responds to you. When you ask a quote for or about something, ' \
+           'then I\'ll try to respond with an appropriate quote.'
     url = URL + "sendMessage?text={}&chat_id={}".format(text, update["message"]["chat"]["id"])
     get_url(url)
 
 
 def is_goodbye_message(text):
-    greetings = ['see you later', 'good bye', 'bye', 'cya', 'later', 'until next time']
-    return any([urllib.pathname2url(text).find(g) for g in greetings])
+    greetings = ['bye', 'cya', 'see you later', 'good bye']
+    return any(g.lower() in text.lower() for g in greetings)
 
 
 def send_goodbye_message(update):
-    text = 'Cya later aligator! I\'m working on some more greetings'
+    greetings = ['Cya later', 'Thanks for passing by', 'Have a good day', 'Until next time']
+    text = random.choice(greetings)
     url = URL + "sendMessage?text={}&chat_id={}".format(text, update["message"]["chat"]["id"])
     get_url(url)
 
 
 def is_quote_request(text):
-    return True
+    quote_requests = ['quote for', 'quote about']
+    return any(q.lower() in text.lower() for q in quote_requests)
 
 
-def send_about_quote(update):
-    text = "I'm thinking about some good quotes, well actually it's still work in progress..."
+def send_quote(update, user_text):
+    if 'quote for' in user_text:
+        relevant_part = user_text.split('quote for')[1]
+    elif 'quote about' in user_text:
+        relevant_part = user_text.split('quote about')[1]
+    query_doc = [w.lower() for w in word_tokenize(relevant_part)]
+    query_doc_bow = dictionary.doc2bow(query_doc)
+    query_doc_tf_idf = tf_idf[query_doc_bow]
+    ms_idx = np.argmax(similarities[query_doc_tf_idf])
+    if isinstance(ms_idx, numbers.Number):
+        text = raw_quotes[ms_idx]
+    else:
+        text = raw_quotes[random.choice(ms_idx)]
     url = URL + "sendMessage?text={}&chat_id={}".format(text, update["message"]["chat"]["id"])
     get_url(url)
+
+
+def send_greeting(text, update):
+    if is_goodbye_message(text):
+        send_goodbye_message(update)
+    elif is_welcome_message(text):
+        send_welcome_message(update)
+    elif is_about_message(text):
+        send_about_message(update)
+    else:
+        echo_message(update)
 
 
 def process_input(updates):
     for update in updates.get('result'):
         msg = update.get('message')
         if msg:
-            text = msg.get('text')
-            if is_welcome_message(text):
-                send_welcome_message(update)
+            text = msg.get('text').encode('utf8')
+            if is_quote_request(text):
+                send_quote(update, text)
+            else:
+                send_greeting(text, update)
 
 
 def main():
+    initialize_similairty_model()
     logging.basicConfig(filename='example.log', level=logging.INFO)
     last_update_id = None
     while True:
         updates = get_updates(last_update_id)
-        if len(updates.get('result')) > 0:
+        if updates.get('result') and len(updates.get('result')) > 0:
             last_update_id = get_last_update_id(updates) + 1
-            echo_all(updates)
             process_input(updates)
         time.sleep(0.5)
 
