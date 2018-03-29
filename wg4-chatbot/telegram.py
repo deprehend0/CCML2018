@@ -22,21 +22,22 @@ import random
 TOKEN = os.environ['CCML_BOT']  # don't put this in your repo! (put in config, then import config)
 URL = "https://api.telegram.org/bot{}/".format(TOKEN)
 
-gen_quotes = None
-dictionary = None
-corpus = None
-tf_idf = None
-similarities = None
-raw_quotes = None
+with open('./quotes/quotes.txt', mode='r') as file:
+    raw_quotes = file.readlines()
+gen_quotes = [[w.lower() for w in word_tokenize(quote)] for quote in raw_quotes]
+dictionary = Dictionary(gen_quotes)
+corpus = [dictionary.doc2bow(gen_quote) for gen_quote in gen_quotes]
+tf_idf = TfidfModel(corpus)
+similarities = Similarity('./quotes/quote_similarities/', tf_idf[corpus], num_features=len(dictionary))
 
-def initialize_similairty_model():
-    with open('./quotes/quotes.txt', mode='r') as file:
-        raw_quotes = file.readlines()
-    gen_quotes = [[w.lower() for w in word_tokenize(quote)] for quote in raw_quotes]
-    dictionary = Dictionary(gen_quotes)
-    corpus = [dictionary.doc2bow(gen_quote) for gen_quote in gen_quotes]
-    tf_idf = TfidfModel(corpus)
-    similarities = Similarity('./quotes/quote_similarities/', tf_idf[corpus], num_features=len(dictionary))
+# gen_quotes = None
+# dictionary = None
+# corpus = None
+# tf_idf = None
+# similarities = None
+# raw_quotes = None
+#
+# def initialize_similairty_model():
 
 
 def get_url(url):
@@ -183,7 +184,6 @@ def process_input(updates):
 
 
 def main():
-    initialize_similairty_model()
     logging.basicConfig(filename='example.log', level=logging.INFO)
     last_update_id = None
     while True:
