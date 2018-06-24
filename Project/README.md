@@ -12,7 +12,9 @@ The excel files are: Persoon_Skills, Skill_lijst and User_Info. Persoon_Skills a
 The python files are the recommender system and graph file. 
 
 **Recommender system**
-The recommender system file is based on a kernel of Kaggle were an implementation of a recommender system is described. In that kernel only recall was used as a metric, in this project the metrics: precision and F1-Score were also added. See the report on how these were calculated. 
+The recommender system file is based on a kernel of Kaggle were an implementation of a recommender system is described. https://www.kaggle.com/gspmoreira/recommender-systems-in-python-101
+
+In that kernel only recall was used as a metric, in this project the metrics: precision and F1-Score were also added. See the report on how these were calculated. 
 
 The code is split into sections and also need to be executed that way. This is because the recommender skills and recommender person approach are integrated into the same code. The only difference is the label encoding based on what you want to have recommended. In the code these specific sections have comment lines added to them, such that each section is clear on how they should be executed. 
 
